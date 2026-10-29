@@ -4,6 +4,7 @@
   "description": "Konwertuje i przełącza kolory między formatami HEX, RGB/RGBA oraz HSL/HSLA.",
   "version": "0.0.4",
   "publisher": "mnosal",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.80.0"
   },
