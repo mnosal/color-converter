@@ -2,7 +2,7 @@
   "name": "color-converter",
   "displayName": "Color Converter (RGB <-> HEX <-> HSL)",
   "description": "Konwertuje i przełącza kolory między formatami HEX, RGB/RGBA oraz HSL/HSLA.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "mnosal",
   "license": "MIT",
   "engines": {

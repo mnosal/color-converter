@@ -2,6 +2,18 @@ const vscode = require('vscode');
 
 // --- Matematyka i parsowanie formatów ---
 
+// Normalizacja kanału alfa (np. "0.5", "8.2%", "50%") na liczbę w zakresie 0-1
+function parseAlpha(aStr) {
+  if (aStr === undefined || aStr === null) return 1;
+  const str = aStr.trim();
+  if (str.endsWith('%')) {
+    const pct = parseFloat(str.slice(0, -1));
+    return isNaN(pct) ? 1 : Math.min(1, Math.max(0, pct / 100));
+  }
+  const val = parseFloat(str);
+  return isNaN(val) ? 1 : Math.min(1, Math.max(0, val));
+}
+
 function parseColor(str) {
   const text = str.trim();
 
@@ -22,27 +34,26 @@ function parseColor(str) {
     return { type: 'hex', r, g, b, a };
   }
 
-  // 2. RGB / RGBA
-  const rgbMatch = text.match(/^rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  // 2. RGB / RGBA: obsługa składni legacy (przecinki) i nowoczesnej (spacje / ukośnik)
+  const rgbMatch = text.match(/^rgba?\s*\(\s*(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*(?:,\s*|\s+)(\d{1,3})\s*(?:(?:\/|,)\s*([\d.]+%?))?\s*\)$/i);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
     const g = parseInt(rgbMatch[2], 10);
     const b = parseInt(rgbMatch[3], 10);
     if (r <= 255 && g <= 255 && b <= 255) {
-      const a = rgbMatch[4] !== undefined ? parseFloat(rgbMatch[4]) : 1;
+      const a = parseAlpha(rgbMatch[4]);
       return { type: 'rgb', r, g, b, a };
     }
   }
 
-  // 3. HSL / HSLA
-  const hslMatch = text.match(/^hsla?\s*\(\s*(\d{1,3}(?:\.\d+)?)\s*,\s*(\d{1,3}(?:\.\d+)?)(?:%)\s*,\s*(\d{1,3}(?:\.\d+)?)(?:%)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  // 3. HSL / HSLA: obsługa składni legacy (przecinki) i nowoczesnej (spacje / ukośnik)
+  const hslMatch = text.match(/^hsla?\s*\(\s*(\d{1,3}(?:\.\d+)?)\s*(?:,\s*|\s+)(\d{1,3}(?:\.\d+)?)%\s*(?:,\s*|\s+)(\d{1,3}(?:\.\d+)?)%\s*(?:(?:\/|,)\s*([\d.]+%?))?\s*\)$/i);
   if (hslMatch) {
     const h = parseFloat(hslMatch[1]) % 360;
     const s = Math.min(100, Math.max(0, parseFloat(hslMatch[2]))) / 100;
     const l = Math.min(100, Math.max(0, parseFloat(hslMatch[3]))) / 100;
-    const a = hslMatch[4] !== undefined ? parseFloat(hslMatch[4]) : 1;
+    const a = parseAlpha(hslMatch[4]);
 
-    // Przeliczenie HSL na RGB
     const k = (n) => (n + h / 30) % 12;
     const f = (n) => l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
     const r = Math.round(f(0) * 255);
@@ -55,7 +66,8 @@ function parseColor(str) {
   return null;
 }
 
-// Formatowanie wyjściowe
+// --- Nowoczesne formatowanie wyjściowe (CSS Color Level 4) ---
+
 function toHexFormat({ r, g, b, a }) {
   const pad = (n) => n.toString(16).padStart(2, '0').toUpperCase();
   let hex = `#${pad(r)}${pad(g)}${pad(b)}`;
@@ -67,9 +79,10 @@ function toHexFormat({ r, g, b, a }) {
 
 function toRgbFormat({ r, g, b, a }) {
   if (a < 1) {
-    return `rgba(${r}, ${g}, ${b}, ${parseFloat(a.toFixed(2))})`;
+    const cleanAlpha = parseFloat(a.toFixed(3));
+    return `rgb(${r} ${g} ${b} / ${cleanAlpha})`;
   }
-  return `rgb(${r}, ${g}, ${b})`;
+  return `rgb(${r} ${g} ${b})`;
 }
 
 function toHslFormat({ r, g, b, a }) {
@@ -105,12 +118,13 @@ function toHslFormat({ r, g, b, a }) {
   const lPct = Math.round(l * 100);
 
   if (a < 1) {
-    return `hsla(${h}, ${sPct}%, ${lPct}%, ${parseFloat(a.toFixed(2))})`;
+    const cleanAlpha = parseFloat(a.toFixed(3));
+    return `hsl(${h} ${sPct}% ${lPct}% / ${cleanAlpha})`;
   }
-  return `hsl(${h}, ${sPct}%, ${lPct}%)`;
+  return `hsl(${h} ${sPct}% ${lPct}%)`;
 }
 
-// Następny krok w pętli: HEX -> RGB -> HSL -> HEX
+// Cykl przełączania: HEX -> RGB -> HSL -> HEX
 function toggleColor(rawText) {
   const parsed = parseColor(rawText);
   if (!parsed) return null;
@@ -128,13 +142,13 @@ function toggleColor(rawText) {
   return null;
 }
 
-// --- Wykrywanie koloru pod kursorem ---
+// --- Wyszukiwanie koloru pod pozycją kursora ---
 
 function findColorRangeAtPosition(document, position) {
   const lineText = document.lineAt(position.line).text;
   const col = position.character;
 
-  const colorRegex = /(hsla?\s*\(\s*\d{1,3}(?:\.\d+)?\s*,\s*\d{1,3}(?:\.\d+)?%\s*,\s*\d{1,3}(?:\.\d+)?%(?:\s*,\s*[\d.]+)?\s*\)|rgba?\s*\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*[\d.]+)?\s*\)|#[A-Fa-f0-9]{8}\b|#[A-Fa-f0-9]{6}\b|#[A-Fa-f0-9]{4}\b|#[A-Fa-f0-9]{3}\b)/gi;
+  const colorRegex = /(hsla?\s*\(\s*\d{1,3}(?:\.\d+)?(?:,|\s+)\s*\d{1,3}(?:\.\d+)?%(?:,|\s+)\s*\d{1,3}(?:\.\d+)?%(?:\s*(?:\/|,)\s*[\d.]+%?)?\s*\)|rgba?\s*\(\s*\d{1,3}(?:,|\s+)\s*\d{1,3}(?:,|\s+)\s*\d{1,3}(?:\s*(?:\/|,)\s*[\d.]+%?)?\s*\)|#[A-Fa-f0-9]{8}\b|#[A-Fa-f0-9]{6}\b|#[A-Fa-f0-9]{4}\b|#[A-Fa-f0-9]{3}\b)/gi;
 
   let match;
   while ((match = colorRegex.exec(lineText)) !== null) {
