@@ -1,0 +1,67 @@
+{
+  "name": "color-converter",
+  "displayName": "Color Converter (RGB <-> HEX <-> HSL)",
+  "description": "Konwertuje i przełącza kolory między formatami HEX, RGB/RGBA oraz HSL/HSLA.",
+  "version": "0.0.4",
+  "publisher": "mnosal",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mnosal/color-converter/"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "colorConverter.toggleColor",
+        "title": "Color Converter: Przełącz format (HEX -> RGB -> HSL -> HEX)"
+      },
+      {
+        "command": "colorConverter.toHex",
+        "title": "Color Converter: Konwertuj do HEX"
+      },
+      {
+        "command": "colorConverter.toRgb",
+        "title": "Color Converter: Konwertuj do RGB/RGBA"
+      },
+      {
+        "command": "colorConverter.toHsl",
+        "title": "Color Converter: Konwertuj do HSL/HSLA"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "colorConverter.toggleColor",
+        "key": "alt+shift+c",
+        "mac": "alt+shift+c",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "colorConverter.toggleColor",
+          "group": "modification@0"
+        },
+        {
+          "command": "colorConverter.toHex",
+          "group": "modification@1"
+        },
+        {
+          "command": "colorConverter.toRgb",
+          "group": "modification@2"
+        },
+        {
+          "command": "colorConverter.toHsl",
+          "group": "modification@3"
+        }
+      ]
+    }
+  }
+}
